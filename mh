@@ -1,0 +1,197 @@
+#!/bin/bash
+
+# If you get: stdin: is not a tty
+# comment `mesg y` in /etc/bashrc
+
+mh_help() {
+  echo "mh [@hosts] [/RE/] [:tag] [--edit=file] [--vz] cmd"
+  echo "  Write host list into ~/.mh, first column is hostname."
+  echo "  Next columns is host tags or aliases separated by spaces."
+  echo "  :abc is tag prefixed with 'abc', :abc: is full tag."
+  echo "  /RE/ to select hosts that grep to regular expression RE."
+  echo "  @host1,host2 @host3 is manually specifying hostnames."
+  echo "  --vz option to enter into openvz containers on target."
+  echo "  --vz=RE to enter only containers where hostname match RE."
+  echo "  --edit=file or --script=file to execute script on remotes."
+  echo "  --edit=file will run editor, while --script=file will not."
+  echo "  Just --edit will edit temporary file, execute, and delete it."
+  echo "  When both script and cmd are used, script will be executed first."
+  echo "  When no command or script is specified list matched hosts."
+  exit
+}
+
+# cleanup and exit
+mh_exit() {
+  if [ -e "$tmpscript" ]; then
+    rm -f "$tmpscript"
+  fi
+}
+trap mh_exit EXIT
+
+if [ -s ~/.ssh-agent ]; then
+  . ~/.ssh-agent >/dev/null
+fi
+if [ ! -S $SSH_AUTH_SOCK ] || ! kill -0 $SSH_AGENT_PID 2>/dev/null; then
+  rm -f ~/.ssh-agent
+  unset SSH_AGENT_PID
+  unset SSH_AUTH_SOCK
+fi
+if [ "$SSH_AUTH_SOCK" = "" ]; then
+  (
+    umask 077
+    ssh-agent > ~/.ssh-agent
+  )
+  . ~/.ssh-agent >/dev/null
+  ssh-add
+fi
+
+mh_tag() {
+  tag="\\b${*#:}"
+  if [[ "$tag" =~ ':$' ]]; then
+    tag="${tag%:}\\b"
+  fi
+  egrep "$tag" ~/.mh | awk '{print $1}'
+}
+mh_regexp() {
+  re=${*#/}
+  re=${re%/}
+  egrep "$re" ~/.mh | awk '{print $1}'
+}
+mh_edit() {
+  if [ "$*" = "" ]; then
+    tmpscript=`tempfile`
+    script=$tmpscript
+  else
+    script="$*"
+  fi
+  ${EDITOR:=vim} "$script"
+  mh_script $script
+}
+mh_script() {
+  script="$*"
+  if [ ! -e "$script" ]; then
+    echo No script file $script >&2
+  elif [ ! -s $script ]; then
+    if [ "$tmpscript" ]; then
+      echo No edit.
+    else
+      echo Much empty script in $script >&2
+    fi
+  elif ! bash -n $script; then
+    echo Syntax error in script $script >&2
+  else
+    return 0
+  fi
+  exit 1
+}
+
+hosts=()
+PREFIX=1
+declare -a arg
+for opt; do
+  shift
+  case "$opt" in
+    -*=*) optarg=`echo "$opt" | sed 's/[-_a-zA-Z0-9]*=//'` ;;
+    *) optarg= ;;
+  esac
+  case "$opt" in
+    :*)   hosts+=(`mh_tag $opt`) ;;
+    /*/)  hosts+=(`mh_regexp $opt`) ;;
+    @*)   hosts+=(`echo ${opt#@} | sed 's/,/ /g'`) ;;
+    --vz*) vz=${optarg:=^} ;;
+    --list) listhosts=1 ;;
+    --script*) mh_script $optarg ;;
+    --edit*)   mh_edit $optarg ;;
+    -H) PREFIX=0 ;;
+    --help|-h) mh_help ;;
+    --) arg+=("$@"); break ;;
+    *) arg+=("$opt") ;;
+  esac
+done
+set -- "${arg[@]}"
+if [ ${#hosts[@]} = 0 ]; then
+  hosts+=(`mh_regexp .`)
+fi
+if [ "$*" = "" -a ! -s "$script" ]; then
+  # if nothing to run, do --list (list matched hosts)
+  listhosts=1
+fi
+if [ "$listhosts" ]; then
+  echo ${hosts[@]}
+  exit
+fi
+
+# run command or script on each vz container, including host
+vz_each() {
+  PATH=$PATH:/usr/sbin
+  type vzlist >/dev/null 2>&1 || return
+  re="$1"
+  shift
+  h=`hostname | cut -d. -f1`
+  hp="`printf "%-17s" $h:`"
+  {
+    if [ "$re" = ^ ]; then
+      if [ ${#scriptvar} -gt 0 ]; then
+	eval "$scriptvar"
+      fi
+      if [ "$*" ]; then
+	"$@"
+      fi
+    fi
+  } | sed "s/^/$hp/"
+  ctids=`vzlist -H -o veid`
+  for ct in $ctids; do
+    h=`vzlist -H -o hostname $ct | cut -d. -f1`
+    shopt -s extglob
+    h=${h%%*( )}
+    shopt -u extglob
+    hp="`printf "%-17s" $h:`"
+    {
+      if [[ "$hp" =~ $re ]]; then
+	if [ ${#scriptvar} -gt 0 ]; then
+	  {
+	    echo "$scriptvar"
+	    printf " %q" "$@"
+	    echo
+	  } | vzctl --quiet exec $ct bash
+	else
+	  vzctl --quiet exec $ct "`printf ' %q' "$@"`"
+	fi
+      fi
+    } 2>&1 | sed "s/^/$hp/"
+  done
+}
+
+# send command and script to target
+do_ssh() {
+  h="$1"
+  shift
+  {
+    if [ "$vz" ]; then
+      declare -f vz_each
+      if [ -s "$script" ]; then
+	printf "scriptvar=%q\n" "`cat $script`"
+      fi
+      printf "vz_each %q" "$vz"
+      printf " %q" "$@"
+      echo
+    else
+      if [ -s "$script" ]; then
+	cat $script
+	echo
+      fi
+      printf " %q" "$@"
+      echo
+    fi
+  } | ssh "$h" bash
+}
+
+# main loop
+for h in "${hosts[@]}"; do
+  hp="`printf "%-9s" $h:`"
+  if [ "$PREFIX" = 1 ]; then
+    do_ssh $h "$@" 2>&1 | sed "s/^/$hp/"
+  else
+    do_ssh $h "$@"
+  fi
+done
