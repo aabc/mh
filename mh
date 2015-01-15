@@ -180,8 +180,10 @@ do_ssh() {
 	cat $script
 	echo
       fi
-      printf " %q" "$@"
-      echo
+      if [ "$*" ]; then
+	printf " %q" "$@"
+	echo
+      fi
     fi
   } | ssh "$h" bash
 }
