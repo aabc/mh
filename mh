@@ -3,10 +3,12 @@
 # If you get: stdin: is not a tty
 # comment `mesg y` in /etc/bashrc
 
+MHCONFIG=~/.mh
 mh_help() {
   echo "Usage: mh [@hosts] [/RE/] [:tag] [--edit=file] [--vz] cmd"
-  echo "  Write host list into ~/.mh, first column is hostname."
-  echo "  Next columns is host tags or aliases separated by spaces."
+  echo "  Write hosts list into ~/.mh or to file specified with @@file"
+  echo "  option. First column is hostname that will be passed to ssh."
+  echo "  Next columns are host tags or aliases separated by spaces."
   echo "  :abc is tag prefixed with 'abc', :abc: is full tag."
   echo "  /RE/ to select hosts that grep to regular expression RE."
   echo "  @host1,host2 @host3 is manually specifying hostnames."
@@ -17,6 +19,9 @@ mh_help() {
   echo "  Just --edit will edit temporary file, execute, and delete it."
   echo "  When both script and cmd are used, script will be executed first."
   echo "  When no command or script is specified list matched hosts."
+  if [ ! -s $MHCONFIG ]; then
+    echo "Currently, no '$MHCONFIG' config file found."
+  fi
   exit
 }
 
@@ -55,12 +60,12 @@ mh_tag() {
   if [[ "$tag" =~ ':$' ]]; then
     tag="${tag%:}\\b"
   fi
-  egrep "$tag" ~/.mh | awk '{print $1}'
+  egrep "$tag" "$MHCONFIG" | awk '{print $1}'
 }
 mh_regexp() {
   re=${*#/}
   re=${re%/}
-  egrep "$re" ~/.mh | awk '{print $1}'
+  egrep "$re" "$MHCONFIG" | awk '{print $1}'
 }
 mh_edit() {
   if [ "$*" = "" ]; then
@@ -93,6 +98,7 @@ mh_script() {
 hosts=()
 PREFIX=1
 declare -a arg
+declare -i listhosts=0
 for opt; do
   shift
   case "$opt" in
@@ -100,11 +106,12 @@ for opt; do
     *) optarg= ;;
   esac
   case "$opt" in
+    @@*)  MHCONFIG=${opt#@@} ;;
     :*)   hosts+=(`mh_tag $opt`) ;;
     /*/)  hosts+=(`mh_regexp $opt`) ;;
     *@*)   hosts+=(`echo ${opt#@} | sed 's/,/ /g'`) ;;
     --vz*) vz=${optarg:=^} ;;
-    --list) listhosts=1 ;;
+    --list) listhosts=2 ;;
     --script*) mh_script $optarg ;;
     --edit*)   mh_edit $optarg ;;
     -H) PREFIX=0 ;;
@@ -120,10 +127,13 @@ if [ ${#hosts[@]} = 0 ]; then
 fi
 if [ "$*" = "" -a ! -s "$script" ]; then
   # if nothing to run, do --list (list matched hosts)
-  listhosts=1
+  listhosts+=1
 fi
-if [ "$listhosts" ]; then
-  echo ${hosts[@]}
+if [ "$listhosts" = 1 ]; then
+  echo "${hosts[@]}"
+  exit
+elif [ "$listhosts" -gt 2 ]; then
+  for i in "${hosts[@]}"; do echo "$i"; done
   exit
 fi
 

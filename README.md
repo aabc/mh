@@ -4,7 +4,7 @@ Execute ssh command or bash script sequentally over list of hosts.
 
 ### Usage
 
-    mh [hosts specificatior] [options] [command...]
+    mh [hosts specificator] [options] [command...]
 
 **Host specificator** is:
 
@@ -12,15 +12,20 @@ Execute ssh command or bash script sequentally over list of hosts.
 - `:abc`  - hosts where tag starts with `abc`.
 - `/RE/`  - hosts which match regular expression.
 
-All above commands select hosts from file `~/.mh`. Format of `~/.mh` file is - first column is host name (and tag), other columns are (just) tags. If you need to specify connection options for hosts, like ssh port, please specify them in `~/.ssh/config`.
+All above commands select hosts from config file `~/.mh`.
+Format of `~/.mh` file is - first column is host name (and tag),
+other columns are (just) tags.
+If you need to specify connection options for hosts, like ssh port,
+please specify them in `~/.ssh/config`.
 
 - `@abc,def @ghi user@xyz`- manually specify hosts w/o using `.mh` file.
+- `@@config` - use alternative config file (in format of `.mh`).
 
-If you don't specify _command_ `mh` will just print selected hosts.
+If you don't specify _command_ `mh` will just print selected hosts (in one row).
 
 **Options** are:
 
-- `--list` list selected hosts and exit, w/o running command.
+- `--list` list selected hosts (one per line) and exit, w/o running command.
 - `-H` suppress hosts prefix in output.
 - `--vz` execute command also in OpenVZ containers on targets using `vzctl exec`.
 - `--vz=RE` to select only containers where hostname matches RE.
@@ -32,7 +37,7 @@ If you don't specify _command_ `mh` will just print selected hosts.
 
 **Tips**:
 
-- Ssh command on two hosts: `mh @hosta @hostb uname -a` or `mh @hosta,hostb uname -a`.
+- Run ssh command on two hosts: `mh @hosta @hostb uname -a` or `mh @hosta,hostb uname -a` or `mh @"hosta hostb" uname -a`.
 
 - To execute several commands use `--edit=` option with meaningful script name: `mh :web: --edit=install-xyz`. No `install-xyz` is required to exists before run. Second run will edit the same file, so it's useful if you made mistake first time. If you don't need to run editor change command to `mh :web: --script=install-xyz`.
 
