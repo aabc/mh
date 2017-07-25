@@ -178,8 +178,8 @@ do_ssh() {
       if [ -s "$script" ]; then
 	printf "scriptvar=%q\n" "`cat $script`"
       fi
-      printf "vz_each %q" "$vz"
-      printf " %q" "$@"
+      printf "vz_each %q " "$vz"
+      echo "$@"
       echo
     else
       if [ -s "$script" ]; then
@@ -187,7 +187,7 @@ do_ssh() {
 	echo
       fi
       if [ "$*" ]; then
-	printf " %q" "$@"
+	echo "$@"
 	echo
       fi
     fi
