@@ -4,7 +4,7 @@
 # comment `mesg y` in /etc/bashrc
 
 mh_help() {
-  echo "mh [@hosts] [/RE/] [:tag] [--edit=file] [--vz] cmd"
+  echo "Usage: mh [@hosts] [/RE/] [:tag] [--edit=file] [--vz] cmd"
   echo "  Write host list into ~/.mh, first column is hostname."
   echo "  Next columns is host tags or aliases separated by spaces."
   echo "  :abc is tag prefixed with 'abc', :abc: is full tag."
@@ -18,6 +18,11 @@ mh_help() {
   echo "  When both script and cmd are used, script will be executed first."
   echo "  When no command or script is specified list matched hosts."
   exit
+}
+
+mh_help_opt() {
+  echo "mh: unrecognized option '$@'"
+  mh_help
 }
 
 # cleanup and exit
@@ -103,9 +108,10 @@ for opt; do
     --script*) mh_script $optarg ;;
     --edit*)   mh_edit $optarg ;;
     -H) PREFIX=0 ;;
-    --help|-h) mh_help ;;
     --) arg+=("$@"); break ;;
-    *) arg+=("$opt") ;;
+    --help|-h) mh_help ;;
+    -*) mh_help_opt $opt ;;
+    *)  arg+=("$opt" "$@"); break ;;
   esac
 done
 set -- "${arg[@]}"
