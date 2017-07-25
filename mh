@@ -102,7 +102,7 @@ for opt; do
   case "$opt" in
     :*)   hosts+=(`mh_tag $opt`) ;;
     /*/)  hosts+=(`mh_regexp $opt`) ;;
-    @*)   hosts+=(`echo ${opt#@} | sed 's/,/ /g'`) ;;
+    *@*)   hosts+=(`echo ${opt#@} | sed 's/,/ /g'`) ;;
     --vz*) vz=${optarg:=^} ;;
     --list) listhosts=1 ;;
     --script*) mh_script $optarg ;;
