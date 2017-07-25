@@ -16,7 +16,8 @@ All above commands select hosts from config file `~/.mh`.
 Format of `~/.mh` file is - first column is host name (and tag),
 other columns are (just) tags.
 If you need to specify connection options for hosts, like ssh port,
-please specify them in `~/.ssh/config`.
+you may specify them in `~/.ssh/config` or append to hostname using
+`_` character instead of spaces (ex. `mh @alpha_-p222 w`).
 
 - `@abc,def @ghi user@xyz`- manually specify hosts w/o using `.mh` file.
 - `@@config` - use alternative config file (in format of `.mh`).

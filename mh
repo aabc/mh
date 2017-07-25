@@ -109,7 +109,7 @@ for opt; do
     @@*)  MHCONFIG=${opt#@@} ;;
     :*)   hosts+=(`mh_tag $opt`) ;;
     /*/)  hosts+=(`mh_regexp $opt`) ;;
-    *@*)   hosts+=(`echo ${opt#@} | sed 's/,/ /g'`) ;;
+    *@*)  hosts+=(`echo ${opt#@} | sed 's/,/ /g'`) ;;
     --vz*) vz=${optarg:=^} ;;
     --list) listhosts=2 ;;
     --script*) mh_script $optarg ;;
@@ -180,7 +180,7 @@ vz_each() {
 
 # send command and script to target
 do_ssh() {
-  h="$1"
+  hopt=${1//_/ }
   shift
   {
     if [ "$vz" ]; then
@@ -201,12 +201,12 @@ do_ssh() {
 	echo
       fi
     fi
-  } | ssh "$h" bash
+  } | ssh $hopt bash
 }
 
 # main loop
 for h in "${hosts[@]}"; do
-  hp="`printf "%-9s" $h:`"
+  hp="`printf "%-9s" ${h/_*}:`"
   if [ "$PREFIX" = 1 ]; then
     do_ssh $h "$@" 2>&1 | sed "s/^/$hp/"
   else
