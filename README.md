@@ -42,3 +42,11 @@ If you don't specify _command_ `mh` will just print selected hosts (in one row).
 
 - To execute several commands use `--edit=` option with meaningful script name: `mh :web: --edit=install-xyz`. No `install-xyz` is required to exists before run. Second run will edit the same file, so it's useful if you made mistake first time. If you don't need to run editor change command to `mh :web: --script=install-xyz`.
 
+**ssh-agent**:
+
+mh tries to use `ssh-agent` to facilitate passwordless login in this way:
+
+- if ssh-agent is already loaded, it's used and next steps are skipped; otherwise
+- if `~/.ssh-agent` file exists it's loaded (for ssh-agent socket configuration);
+- if it's stale, ssh-agent is started, `~/.ssh-agent` is recreated, and `ssh-add` run.
+

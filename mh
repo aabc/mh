@@ -38,23 +38,6 @@ mh_exit() {
 }
 trap mh_exit EXIT
 
-if [ -s ~/.ssh-agent ]; then
-  . ~/.ssh-agent >/dev/null
-fi
-if [ ! -S $SSH_AUTH_SOCK ] || ! kill -0 $SSH_AGENT_PID 2>/dev/null; then
-  rm -f ~/.ssh-agent
-  unset SSH_AGENT_PID
-  unset SSH_AUTH_SOCK
-fi
-if [ "$SSH_AUTH_SOCK" = "" ]; then
-  (
-    umask 077
-    ssh-agent > ~/.ssh-agent
-  )
-  . ~/.ssh-agent >/dev/null
-  ssh-add
-fi
-
 mh_tag() {
   tag="\\b${*#:}"
   if [[ "$tag" =~ ':$' ]]; then
@@ -135,6 +118,27 @@ if [ "$listhosts" = 1 ]; then
 elif [ "$listhosts" -gt 2 ]; then
   for i in "${hosts[@]}"; do echo "$i"; done
   exit
+fi
+
+if [ -S "$SSH_AUTH_SOCK" -a "$SSH_AGENT_PID" ] && kill -0 "$SSH_AGENT_PID" 2>/dev/null; then
+  : # do nothing, use already loaded ssh-agent
+else
+  # ssh-agent is not usable, try to load new one
+  if [ -s ~/.ssh-agent ]; then
+    . ~/.ssh-agent >/dev/null
+  fi
+  if [ ! -S "$SSH_AUTH_SOCK" ] || ! kill -0 "$SSH_AGENT_PID" 2>/dev/null; then
+    rm -f ~/.ssh-agent
+    unset SSH_AGENT_PID SSH_AUTH_SOCK
+  fi
+  if [ "$SSH_AUTH_SOCK" = "" ]; then
+    (
+      umask 077
+      ssh-agent > ~/.ssh-agent
+    )
+    . ~/.ssh-agent >/dev/null
+    ssh-add
+  fi
 fi
 
 # run command or script on each vz container, including host
